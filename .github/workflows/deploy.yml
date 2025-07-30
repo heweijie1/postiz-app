@@ -1,0 +1,60 @@
+name: 🚀 自动部署到云归服务器
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: 部署应用
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 🔧 设置Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: 📦 设置pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        
+    - name: 📋 获取pnpm store目录
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+        
+    - name: 🗂️ 设置pnpm缓存
+      uses: actions/cache@v3
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+          
+    - name: 📦 安装依赖
+      run: pnpm install --frozen-lockfile
+      
+    - name: 🔨 构建项目
+      run: |
+        NODE_ENV=production pnpm run build
+        
+    - name: 📁 创建部署包
+      run: |
+        mkdir -p deploy-package
+        cp -r apps deploy-package/
+        cp -r libraries deploy-package/
+        cp -r node_modules deploy-package/
+        cp package.json pnpm-lock.yaml pnpm-workspace.yaml deploy-package/
+        cp -r .next deploy-package/ 2>/dev/null || true
+        tar -czf deploy-package.tar.gz deploy-package/
+        
+    - name: 🚀 部署到服务器
+      run: |
+        # 这里将通过自托管runner在服务器上执行
+        echo "部署包已准备完成"
